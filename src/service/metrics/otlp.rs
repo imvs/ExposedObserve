@@ -448,6 +448,7 @@ pub async fn handle_otlp_request(
                     &mut metric_schema_map,
                     vec![val_map],
                     timestamp,
+                    false, // is_derived is false for metrics
                 )
                 .await
                 .is_ok()

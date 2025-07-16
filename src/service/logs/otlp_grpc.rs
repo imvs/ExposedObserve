@@ -116,7 +116,7 @@ pub async fn handle_grpc_request(
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
     let mut size_by_stream = HashMap::new();
-
+    let mut derived_streams = HashSet::new();
     let mut res = ExportLogsServiceResponse {
         partial_success: None,
     };
@@ -344,6 +344,9 @@ pub async fn handle_grpc_request(
                     }
 
                     let destination_stream = stream_params.stream_name.to_string();
+                    if !derived_streams.contains(&destination_stream) {
+                        derived_streams.insert(destination_stream.clone());
+                    }
                     if !user_defined_schema_map.contains_key(&destination_stream) {
                         // a new dynamically created stream. need to check the two maps again
                         crate::service::ingestion::get_uds_and_original_data_streams(
@@ -466,6 +469,7 @@ pub async fn handle_grpc_request(
         &mut status,
         json_data_by_stream,
         size_by_stream,
+        derived_streams,
     )
     .await
     {

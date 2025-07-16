@@ -150,7 +150,7 @@ pub async fn logs_json_handler(
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
     let mut size_by_stream = HashMap::new();
-
+    let mut derived_streams = HashSet::new();
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
         Err(e) => {
@@ -475,6 +475,10 @@ pub async fn logs_json_handler(
                     }
 
                     let destination_stream = stream_params.stream_name.to_string();
+                    if !derived_streams.contains(&destination_stream) {
+                        derived_streams.insert(destination_stream.clone());
+                    }
+
                     if !user_defined_schema_map.contains_key(&destination_stream) {
                         // a new dynamically created stream. need to check the two maps again
                         crate::service::ingestion::get_uds_and_original_data_streams(
@@ -597,6 +601,7 @@ pub async fn logs_json_handler(
         &mut status,
         json_data_by_stream,
         size_by_stream,
+        derived_streams,
     )
     .await
     {

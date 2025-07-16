@@ -135,6 +135,7 @@ pub async fn multi(
         IngestionRequest::Multi(&body),
         user_email,
         None,
+        false,
     )
     .await
     {
@@ -210,6 +211,7 @@ pub async fn json(
         IngestionRequest::JSON(&body),
         user_email,
         None,
+        false,
     )
     .await
     {
@@ -282,6 +284,7 @@ pub async fn handle_kinesis_request(
             IngestionRequest::KinesisFH(&post_data.into_inner()),
             user_email,
             None,
+            false,
         )
         .await
         {
@@ -319,6 +322,7 @@ pub async fn handle_gcp_request(
             IngestionRequest::GCP(&post_data.into_inner()),
             user_email,
             None,
+            false,
         )
         .await
         {

@@ -41,6 +41,15 @@ impl Ingest for Ingester {
         let stream_type: StreamType = req.stream_type.into();
         let stream_name = req.stream_name;
         let in_data = req.data.unwrap_or_default();
+        let is_derived = req
+            .metadata
+            .as_ref()
+            .and_then(|m| {
+                m.data
+                    .get("is_derived")
+                    .and_then(|v| v.parse::<bool>().ok())
+            })
+            .unwrap_or(false);
 
         let resp = match stream_type {
             StreamType::Logs => {
@@ -55,6 +64,7 @@ impl Ingest for Ingester {
                         ingestion_req,
                         "",
                         None,
+                        is_derived,
                     )
                     .await
                     .map_or_else(Err, |_| Ok(())),
