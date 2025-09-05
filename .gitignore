@@ -24,3 +24,8 @@ flamegraph.html
 # web distribution
 /web/dist
 /web/.env
+/tests/ui-testing/test-archives
+/test-logs
+/tests/ui-testing/test-logs
+/test-results
+tests/ui-testing/CLAUDE.md
