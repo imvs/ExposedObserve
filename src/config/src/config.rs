@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 8;
+pub const DB_SCHEMA_VERSION: u64 = 10;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -811,7 +811,7 @@ pub struct Common {
     pub feature_join_right_side_max_rows: usize,
     #[env_config(
         name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
-        default = false,
+        default = true,
         help = "Enable broadcast join"
     )]
     pub feature_broadcast_join_enabled: bool,
@@ -827,6 +827,24 @@ pub struct Common {
         help = "Max size for left side of broadcast join, default to 10 MB"
     )]
     pub feature_broadcast_join_left_side_max_size: usize, // MB
+    #[env_config(
+        name = "ZO_FEATURE_ENRICHMENT_BROADCAST_JOIN_ENABLED",
+        default = false,
+        help = "Enable enrichment table broadcast join"
+    )]
+    pub feature_enrichment_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
+        default = true,
+        help = "Enable dynamic pushdown filter"
+    )]
+    pub feature_dynamic_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
+        default = true,
+        help = "Enable single node optimize(used for debug, not document)"
+    )]
+    pub feature_single_node_optimize_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_QUERY_SKIP_WAL",
         default = false,
@@ -904,6 +922,8 @@ pub struct Common {
     pub telemetry_url: String,
     #[env_config(name = "ZO_TELEMETRY_HEARTBEAT", default = 1800)] // seconds
     pub telemetry_heartbeat: i64,
+    #[env_config(name = "ZO_KEYEVENT_TELEMETRY_URL", default = "")]
+    pub keyevent_telemetry_url: String,
     #[env_config(name = "ZO_PROMETHEUS_ENABLED", default = true)]
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
@@ -1045,24 +1065,6 @@ pub struct Common {
         help = "Streams for which dedicated MemTable will be used as comma separated values"
     )]
     pub mem_table_individual_streams: String,
-    #[env_config(
-        name = "ZO_TRACES_SPAN_METRICS_ENABLED",
-        default = false,
-        help = "enable span metrics for traces"
-    )]
-    pub traces_span_metrics_enabled: bool,
-    #[env_config(
-        name = "ZO_TRACES_SPAN_METRICS_EXPORT_INTERVAL",
-        default = 60,
-        help = "traces span metrics export interval, unit seconds"
-    )]
-    pub traces_span_metrics_export_interval: u64,
-    #[env_config(
-        name = "ZO_TRACES_SPAN_METRICS_CHANNEL_BUFFER",
-        default = 100000,
-        help = "traces span metrics channel send buffer"
-    )]
-    pub traces_span_metrics_channel_buffer: usize,
     #[env_config(
         name = "ZO_SELF_METRIC_CONSUMPTION_ENABLED",
         default = false,
@@ -1223,7 +1225,7 @@ pub struct Limit {
         help = "Maximum number of fields allowed in user-defined schema"
     )]
     pub user_defined_schema_max_fields: usize,
-    // MB, total data size in memory, default is 50% of system memory
+    // MB, total data size of memtable in memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,
     #[env_config(
@@ -2316,6 +2318,15 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check search job retention
     if cfg.limit.search_job_retention == 0 {
         return Err(anyhow::anyhow!("search job retention is set to zero"));
+    }
+
+    if cfg.common.tracing_search_enabled
+        && cfg.common.otel_otlp_url.is_empty()
+        && cfg.common.otel_otlp_grpc_url.is_empty()
+    {
+        return Err(anyhow::anyhow!(
+            "Either grpc or http url should be set when enabling tracing search"
+        ));
     }
 
     // HACK instance_name

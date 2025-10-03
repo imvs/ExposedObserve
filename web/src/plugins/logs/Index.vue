@@ -406,6 +406,9 @@ import {
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useStreams from "@/composables/useStreams";
+import { contextRegistry } from "@/composables/contextProviders";
+import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
+
 
 export default defineComponent({
   name: "PageSearch",
@@ -652,7 +655,7 @@ export default defineComponent({
       schemaCache.value = null;
     };
 
-    const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
+    const { registerAiChatHandler, removeAiChatHandler, initializeDefaultContext } = useAiChat();
 
     onUnmounted(() => {
       // reset logsVisualizeToggle when user navigate to other page with keepAlive is false and navigate back to logs page
@@ -684,6 +687,7 @@ export default defineComponent({
       }
 
       registerAiContextHandler();
+      setupContextProvider();
     });
 
     onBeforeUnmount(async () => {
@@ -694,6 +698,7 @@ export default defineComponent({
       cancelQuery();
 
       removeAiContextHandler();
+      cleanupContextProvider();
 
       // Clear any pending timeouts
       clearAllTimeouts();
@@ -1098,7 +1103,7 @@ export default defineComponent({
             (currentQuery.toLowerCase() === "select" ||
               currentQuery.toLowerCase().indexOf("select ") == 0);
           //check if user try to applied saved views in which sql mode is enabled.
-          if (currentQuery.indexOf("SELECT") >= 0) {
+          if (currentQuery.toLowerCase().indexOf("select") >= 0) {
             return;
           }
 
@@ -1554,6 +1559,27 @@ export default defineComponent({
             // Mark that we've processed the first toggle
             if (isFirstVisualizationToggle.value) {
               isFirstVisualizationToggle.value = false;
+            }
+
+            let logsPageQuery = "";
+
+            // handle sql mode
+            if (!searchObj.meta.sqlMode) {
+              const queryBuild = buildSearch();
+              logsPageQuery = queryBuild?.query?.sql ?? "";
+            } else {
+              logsPageQuery = searchObj.data.query;
+            }
+
+            // Check if query is SELECT * which is not supported for visualization
+            if (
+              store.state.zoConfig.quick_mode_enabled === true &&
+              isSimpleSelectAllQuery(logsPageQuery)
+            ) {
+              showErrorNotification(
+                "Select * query is not supported for visualization",
+              );
+              return;
             }
 
             // Use conditional auto-selection based on first toggle and URL chart type
@@ -2253,6 +2279,41 @@ export default defineComponent({
     };
 
     // [END] O2 AI Context Handler
+
+    // [START] Context Provider Setup
+
+    /**
+     * Setup the logs context provider for AI chat integration
+     * 
+     * Example: When user opens logs page, this registers the context provider
+     * that will extract current search state and comprehensive schema information for AI context
+     * Follows the same schema extraction pattern as legacy AI context system
+     */
+    const setupContextProvider = () => {
+      const provider = createLogsContextProvider(
+        searchObj, 
+        store, 
+        dashboardPanelData
+      );
+      
+      contextRegistry.register('logs', provider);
+      contextRegistry.setActive('logs');
+    };
+
+    /**
+     * Cleanup logs context provider when leaving logs page
+     * 
+     * Example: When user navigates away from logs, this deactivates the logs provider
+     * but keeps the default provider available for fallback
+     */
+    const cleanupContextProvider = () => {
+      // Only unregister the logs provider, keep default provider
+      contextRegistry.unregister('logs');
+      // Reset to no active provider, so it falls back to default
+      contextRegistry.setActive('');
+    };
+
+    // [END] Context Provider Setup
 
     const sendToAiChat = (value: any) => {
       emit("sendToAiChat", value);
