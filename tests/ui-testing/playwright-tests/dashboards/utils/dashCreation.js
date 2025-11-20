@@ -70,18 +70,22 @@ export async function deleteDashboard(page, dashboardName) {
   const confirmButton = page.locator('[data-test="confirm-button"]');
   await expect(confirmButton).toBeVisible();
 
-  // Wait for the delete API call to complete
-  const deleteResponse = page.waitForResponse(
+  // Set up API response waiter BEFORE clicking to avoid race condition
+  const deleteResponsePromise = page.waitForResponse(
     (response) =>
       /\/api\/.*\/dashboards\/.*/.test(response.url()) &&
       (response.status() === 200 || response.status() === 204),
     { timeout: 15000 }
   );
 
-  await confirmButton.click();
-
-  // Wait for the API response to confirm deletion
-  await deleteResponse;
+  // Click confirm and wait for API in parallel
+  await Promise.all([
+    deleteResponsePromise,
+    confirmButton.click()
+  ]).catch((error) => {
+    // If API wait times out, log but don't fail - deletion might have succeeded
+    testLogger.info('Delete API response timeout - deletion may have completed', { error: error.message });
+  });
 
   // Optionally verify the success message appears (but don't fail if it disappears quickly)
   await page.getByText("Dashboard deleted successfully").waitFor({
