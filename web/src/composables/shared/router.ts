@@ -327,6 +327,7 @@ const useRoutes = () => {
                 import("@/components/pipelines/PipelineHistory.vue"),
               meta: {
                 title: "Pipeline History",
+                parent: "pipelines",
               },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
